@@ -135,10 +135,11 @@ typedef struct super_block {
 // } dinode_t;
 // on-disk inode
 typedef struct dinode{
-  uint32_t type;   // file type
-  uint32_t device; // if it is a dev, its dev_id
+  uint16_t type;   // file type
+  uint16_t device; // if it is a dev, its dev_id
   uint32_t size;   // file size
   uint32_t addrs[NDIRECT + 2]; // data block addresses, 12 direct and 1 indirect
+  uint32_t ref;    // reference count
 } dinode_t;
 
 struct inode {
@@ -679,4 +680,48 @@ int iremove(const char *path) {
   return 0;
 }
 
+int ilink(const char * oldpath, const char *newpath) {
+  // Open the old file
+  inode_t *oldinode = iopen(oldpath, TYPE_NONE);
+  if (oldinode == NULL) {
+    return -1;
+  }
+
+  // Open the parent directory of the new path
+  char name[MAX_NAME + 1];
+  inode_t *parent = iopen_parent(newpath, name);
+  if (parent == NULL) {
+    iclose(oldinode);
+    return -1;
+  }
+
+  // Check if the new path already exists
+  if (ilookup(parent, name, NULL, TYPE_NONE) != NULL) {
+    iclose(parent);
+    iclose(oldinode);
+    return -1;
+  }
+
+  // Create a new directory entry for the new path
+  dirent_t dirent;
+  dirent.inode = oldinode->no;
+  strncpy(dirent.name, name, MAX_NAME);
+  dirent.name[MAX_NAME] = '\0';
+
+  // Write the new directory entry to the parent directory
+  uint32_t off = isize(parent);
+  if (iwrite(parent, off, &dirent, sizeof(dirent)) != sizeof(dirent)) {
+    iclose(parent);
+    iclose(oldinode);
+    return -1;
+  }
+
+  // Increase the reference count of the old file
+  oldinode->dinode.ref += 1;
+  iupdate(oldinode);
+
+  iclose(parent);
+  iclose(oldinode);
+  return 0;
+}
 #endif
