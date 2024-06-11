@@ -177,6 +177,10 @@ static uint32_t dialloc(int type) {
     diread(&dinode, i);
     if (dinode.type == TYPE_NONE) {
       dinode.type = type;
+      if (type == TYPE_SYMLINK) {
+        dinode.size = 0;
+        memset(dinode.addrs, 0, sizeof(dinode.addrs));
+      }
       diwrite(&dinode, i);
       return i;
     }
@@ -217,6 +221,9 @@ static void bfree(uint32_t blkno) {
   uint32_t byte;
   int i = blkno / 32;
   int j = blkno % 32;
+  if(i * 4 +4 > BLK_SIZE){
+    printf("Error in bfree: i * 4 (%u) + sizeof(uint32_t) (%u) exceeds BLK_SIZE (%u)\n", i * 4, sizeof(uint32_t), BLK_SIZE);
+  }
   bread(&byte, 4, sb.bitmap, i * 4);
   byte &= ~(1<< j);
   bwrite(&byte, 4,sb.bitmap, 4 *i );
@@ -430,6 +437,7 @@ static uint32_t iwalk(inode_t *inode, uint32_t no) {
     if (inode->dinode.addrs[no] == 0) {
       inode->dinode.addrs[no] = balloc();
       iupdate(inode);
+      
     }
     return inode->dinode.addrs[no];
   }
@@ -441,6 +449,10 @@ static uint32_t iwalk(inode_t *inode, uint32_t no) {
       iupdate(inode);
     }
     uint32_t indirect;
+    // if (no * sizeof(uint32_t) + sizeof(uint32_t) > BLK_SIZE) {
+    //   printf("Error in iwalk: indirect read size (%u) + offset (%u) exceeds BLK_SIZE (%u)\n", sizeof(uint32_t), no * sizeof(uint32_t), BLK_SIZE);
+    //   assert(0);
+    // }
     bread(&indirect, sizeof(uint32_t), inode->dinode.addrs[NDIRECT], no * sizeof(uint32_t));
     if (indirect == 0) {
       indirect = balloc();
@@ -456,11 +468,19 @@ static uint32_t iwalk(inode_t *inode, uint32_t no) {
       iupdate(inode);
     }
     uint32_t indirect1, indirect2;
+    // if ((no / NINDIRECT) * sizeof(uint32_t) + sizeof(uint32_t) > BLK_SIZE) {
+    //   printf("Error in iwalk: indirect1 read size (%u) + offset (%u) exceeds BLK_SIZE (%u)\n", sizeof(uint32_t), (no / NINDIRECT) * sizeof(uint32_t), BLK_SIZE);
+    //   assert(0);
+    // }
     bread(&indirect1, sizeof(uint32_t), inode->dinode.addrs[NDIRECT + 1], (no / NINDIRECT) * sizeof(uint32_t));
     if (indirect1 == 0) {
       indirect1 = balloc();
       bwrite(&indirect1, sizeof(uint32_t), inode->dinode.addrs[NDIRECT + 1], (no / NINDIRECT) * sizeof(uint32_t));
     }
+    // if ((no % NINDIRECT) * sizeof(uint32_t) + sizeof(uint32_t) > BLK_SIZE) {
+    //   printf("Error in iwalk: indirect2 read size (%u) + offset (%u) exceeds BLK_SIZE (%u)\n", sizeof(uint32_t), (no % NINDIRECT) * sizeof(uint32_t), BLK_SIZE);
+    //   assert(0);
+    // }
     bread(&indirect2, sizeof(uint32_t), indirect1, (no % NINDIRECT) * sizeof(uint32_t));
     if (indirect2 == 0) {
       indirect2 = balloc();
@@ -472,6 +492,12 @@ static uint32_t iwalk(inode_t *inode, uint32_t no) {
 }
 
 int iread(inode_t *inode, uint32_t off, void *buf, uint32_t len) {
+  if (itype(inode) == TYPE_SYMLINK) {
+    len = MIN(len, inode->dinode.size - off);
+    memcpy(buf, (char *)inode->dinode.addrs + off, len);
+    return len;
+  }
+
   uint32_t blkno = iwalk(inode, off / BLK_SIZE);
   uint32_t blkoff = off % BLK_SIZE;
   uint32_t remaining = len;
@@ -480,6 +506,9 @@ int iread(inode_t *inode, uint32_t off, void *buf, uint32_t len) {
   while (remaining > 0 && off + bytesRead < isize(inode)) {
     uint32_t bytesToRead = MIN(remaining, BLK_SIZE - blkoff);
     bytesToRead = MIN(bytesToRead, isize(inode) - off - bytesRead);
+    // if (blkoff + bytesToRead > BLK_SIZE) {
+    //   printf("Error in iread: blkoff (%u) + bytesToRead (%u) exceeds BLK_SIZE (%u)\n", blkoff, bytesToRead, BLK_SIZE);
+    // }
     bread(buf + bytesRead, bytesToRead, blkno, blkoff);
     bytesRead += bytesToRead;
     remaining -= bytesToRead;
@@ -491,6 +520,15 @@ int iread(inode_t *inode, uint32_t off, void *buf, uint32_t len) {
 }
 
 int iwrite(inode_t *inode, uint32_t off, const void *buf, uint32_t len) {
+  
+  if (itype(inode) == TYPE_SYMLINK) {
+    len = MIN(len, sizeof(inode->dinode.addrs) - off);
+    memcpy((char *)inode->dinode.addrs + off, buf, len);
+    inode->dinode.size = off + len;
+    iupdate(inode);
+    return len;
+  }
+  
   if (off > isize(inode)) {
     return -1;
   }
@@ -547,6 +585,9 @@ void itrunc(inode_t *inode) {
   // mark all address of inode 0 and mark its size 0
   for (int i = 0; i < NDIRECT; i++) {
     if (inode->dinode.addrs[i]) {
+      if(inode->dinode.addrs[i] > 4096*32){
+        printf("Error in itrunc: inode->dinode.addrs[%d] (%u) > 4096*32\n", i, inode->dinode.addrs[i]);
+      }
       bfree(inode->dinode.addrs[i]);
       inode->dinode.addrs[i] = 0;
     }
@@ -569,10 +610,10 @@ void itrunc(inode_t *inode) {
     uint32_t indirect1 = inode->dinode.addrs[NDIRECT + 1];
     uint32_t indirect2;
     uint32_t block;
-    for (int i = 0; i < NINDIRECT; i++) {
+    for (int i = 0; i < NINDIRECT; i++) {   
       bread(&indirect2, sizeof(uint32_t), indirect1, i * sizeof(uint32_t));
       if (indirect2) {
-        for (int j = 0; j < NINDIRECT; j++) {
+        for (int j = 0; j < NINDIRECT; j++) {      
           bread(&block, sizeof(uint32_t), indirect2, j * sizeof(uint32_t));
           if (block) {
             bfree(block);
@@ -598,7 +639,9 @@ inode_t *idup(inode_t *inode) {
 void iclose(inode_t *inode) {
   assert(inode);
   if (inode->ref == 1 && inode->del) {
-    itrunc(inode);
+    if (itype(inode) != TYPE_SYMLINK) {
+      itrunc(inode);
+    }
     difree(inode->no);
   }
   inode->ref -= 1;
@@ -724,4 +767,52 @@ int ilink(const char * oldpath, const char *newpath) {
   iclose(oldinode);
   return 0;
 }
+
+
+int isymlink(const char *oldpath, const char *newpath) {
+  // Open the parent directory of the new path
+  char name[MAX_NAME + 1];
+  inode_t *parent = iopen_parent(newpath, name);
+  if (parent == NULL) {
+    return -1;
+  }
+
+  // Check if the new path already exists
+  if (ilookup(parent, name, NULL, TYPE_NONE) != NULL) {
+    iclose(parent);
+    return -1;
+  }
+
+  // Allocate a new inode for the symlink
+  uint32_t ino = dialloc(TYPE_SYMLINK);
+  inode_t *inode = iget(ino);
+  if (inode == NULL) {
+    iclose(parent);
+    return -1;
+  }
+
+  // Initialize the inode as a symbolic link
+  inode->dinode.size = strlen(oldpath);
+  iwrite(inode, 0, oldpath, strlen(oldpath));
+  iupdate(inode);
+
+  // Create a new directory entry for the symlink
+  dirent_t dirent;
+  dirent.inode = ino;
+  strncpy(dirent.name, name, MAX_NAME);
+  dirent.name[MAX_NAME] = '\0';
+
+  // Write the new directory entry to the parent directory
+  uint32_t off = isize(parent);
+  if (iwrite(parent, off, &dirent, sizeof(dirent)) != sizeof(dirent)) {
+    iclose(parent);
+    iclose(inode);
+    return -1;
+  }
+
+  iclose(parent);
+  iclose(inode);
+  return 0;
+}
+
 #endif

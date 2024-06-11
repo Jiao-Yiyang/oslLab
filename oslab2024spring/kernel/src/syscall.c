@@ -330,7 +330,7 @@ int sys_link(const char *oldpath, const char *newpath) {
 }
 
 int sys_symlink(const char *oldpath, const char *newpath) {
-  TODO();
+  return isymlink(oldpath, newpath);
 }
 
 void *syscall_handle[NR_SYS] = {

@@ -70,6 +70,10 @@ static bcache_t *bgetcache(uint32_t no) {
 
 void bread(void *dst, uint32_t size, uint32_t no, uint32_t off) {
   // read blk no's [off, off+size) to dst, promise off+size<=BLK_SIZE
+  // if(size + off > BLK_SIZE){
+  //   printf("Error: size + off exceeds BLK_SIZE. size: %u, off: %u, BLK_SIZE: %u\n", size, off, BLK_SIZE);
+ 
+  // }
   assert(size + off <= BLK_SIZE);
   bcache_t *bc = bgetcache(no);
   memcpy(dst, &bc->buf[off], size);
