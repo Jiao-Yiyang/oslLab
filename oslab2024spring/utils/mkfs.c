@@ -41,8 +41,9 @@ void panic(const char *msg) {
 #define IPERBLK   (BLK_SIZE / sizeof(dinode_t)) // inode num per blk
 #define INODE_NUM ((DATA_START - INODE_START) * IPERBLK)
 
-#define NDIRECT   12
+#define NDIRECT 11
 #define NINDIRECT (BLK_SIZE / sizeof(uint32_t))
+#define MAXFILE (NDIRECT + NINDIRECT + NINDIRECT * NINDIRECT)
 
 #define TYPE_NONE 0
 #define TYPE_FILE 1
@@ -71,7 +72,7 @@ typedef struct {
   uint32_t type;   // file type
   uint32_t device; // if it is a dev, its dev_id
   uint32_t size;   // file size
-  uint32_t addrs[NDIRECT + 1]; // data block addresses, 12 direct and 1 indirect
+  uint32_t addrs[NDIRECT + 2]; // data block addresses, 12 direct and 1 indirect
 } dinode_t;
 
 // directory is a file containing a sequence of dirent structures
@@ -162,25 +163,56 @@ uint32_t ialloc(int type) {
   return next_inode++;
 }
 
+// blk_t *iwalk(dinode_t *file, uint32_t blk_no) {
+//   // return the pointer to the file's data's blk_no th block, if no, alloc it
+//   if (blk_no < NDIRECT) {
+//     // direct address
+//     if (file->addrs[blk_no] == 0) {
+//       file->addrs[blk_no] = balloc();
+//     }
+//     return bget(file->addrs[blk_no]);
+//   }
+//   blk_no -= NDIRECT;
+//   if (blk_no < NINDIRECT) {
+//     if (file->addrs[NDIRECT] == 0) {
+//       file->addrs[NDIRECT] = balloc();
+//     }
+//     uint32_t *indirect = (uint32_t *)bget(file->addrs[NDIRECT]);
+//     if (indirect[blk_no] == 0) {
+//       indirect[blk_no] = balloc();
+//     }
+//     return bget(indirect[blk_no]);
+//   }
+//   panic("file too big");
+// }
 blk_t *iwalk(dinode_t *file, uint32_t blk_no) {
-  // return the pointer to the file's data's blk_no th block, if no, alloc it
   if (blk_no < NDIRECT) {
-    // direct address
     if (file->addrs[blk_no] == 0) {
       file->addrs[blk_no] = balloc();
     }
     return bget(file->addrs[blk_no]);
-  }
-  blk_no -= NDIRECT;
-  if (blk_no < NINDIRECT) {
+  } else if (blk_no < NDIRECT + NINDIRECT) {
     if (file->addrs[NDIRECT] == 0) {
       file->addrs[NDIRECT] = balloc();
     }
     uint32_t *indirect = (uint32_t *)bget(file->addrs[NDIRECT]);
-    if (indirect[blk_no] == 0) {
-      indirect[blk_no] = balloc();
+    if (indirect[blk_no - NDIRECT] == 0) {
+      indirect[blk_no - NDIRECT] = balloc();
     }
-    return bget(indirect[blk_no]);
+    return bget(indirect[blk_no - NDIRECT]);
+  } else if (blk_no < MAXFILE) {
+    if (file->addrs[NDIRECT + 1] == 0) {
+      file->addrs[NDIRECT + 1] = balloc();
+    }
+    uint32_t *indirect1 = (uint32_t *)bget(file->addrs[NDIRECT + 1]);
+    if (indirect1[(blk_no - NDIRECT - NINDIRECT) / NINDIRECT] == 0) {
+      indirect1[(blk_no - NDIRECT - NINDIRECT) / NINDIRECT] = balloc();
+    }
+    uint32_t *indirect2 = (uint32_t *)bget(indirect1[(blk_no - NDIRECT - NINDIRECT) / NINDIRECT]);
+    if (indirect2[(blk_no - NDIRECT - NINDIRECT) % NINDIRECT] == 0) {
+      indirect2[(blk_no - NDIRECT - NINDIRECT) % NINDIRECT] = balloc();
+    }
+    return bget(indirect2[(blk_no - NDIRECT - NINDIRECT) % NINDIRECT]);
   }
   panic("file too big");
 }
