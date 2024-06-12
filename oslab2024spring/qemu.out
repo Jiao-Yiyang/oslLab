@@ -24,4 +24,4 @@ $ ls contest/1/2
 ..                          2 160 29
 $ echo OK
 OK
-$ qemu-system-i386: terminating on signal 15 from pid 58293 (make)
+$ qemu-system-i386: terminating on signal 15 from pid 67982 (make)
