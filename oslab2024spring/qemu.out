@@ -1,27 +1,22 @@
 
 Hello from OS!
-$ cat contest1.txt
-cat: cannot open contest1.txt
-$ cat contest2.txt
-hi
-bye
-$ ls contest
-.                           2 128 27
-..                          2 864 1
-1                           2 160 29
-2                           1 3 32
-$ cat contest/2
-hi
-$ ls contest/1
-.                           2 160 29
-..                          2 128 27
-1                           1 6 30
-2                           2 64 31
-$ cat contest/1/1
+$ echo 114514 hello > hello.txt
+$ cat hello.txt
+114514 hello
+$ echo bye 1919810 >> hello.txt
+$ cat hello.txt
+114514 hello
+bye 1919810
+$ cat words.txt > hello.txt
+$ cat hello.txt
+hello world
+nihao shijie
+ohayou seikai
+$ echo > hello.txt
+$ cat hello.txt
+$ echo hello > /dev/serial
 hello
-$ ls contest/1/2
-.                           2 64 31
-..                          2 160 29
+$ echo hello > /dev/null
 $ echo OK
 OK
-$ qemu-system-i386: terminating on signal 15 from pid 123811 (make)
+$ qemu-system-i386: terminating on signal 15 from pid 141410 (make)

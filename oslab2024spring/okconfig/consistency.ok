@@ -1,6 +1,6 @@
 {
-    "name": "consistency",
-    "endpoint": "consistency",
+    "name": "concurrency",
+    "endpoint": "concurrency",
     "src": [
         "boot/boot.c",
         "boot/boot.h",
@@ -39,7 +39,9 @@
         "kernel/src/timer.c",
         "kernel/src/trap.S",
         "kernel/src/vme.c",
-        "utils/mkfs.c"
+        "utils/mkfs.c",
+        "user/ulib/syscall.c",
+        "user/include/ulib.h"
     ],
     "tests": {},
     "protocols": [
@@ -49,4 +51,3 @@
         "backup"
     ]
 }
-
