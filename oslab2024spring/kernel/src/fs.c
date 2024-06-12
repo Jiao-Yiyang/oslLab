@@ -169,6 +169,10 @@ static uint32_t dialloc(int type) {
     diread(&dinode, i);
     if (dinode.type == TYPE_NONE) {
       dinode.type = type;
+      if (type == TYPE_SYMLINK) {
+        dinode.size = 0;
+        memset(dinode.addrs, 0, sizeof(dinode.addrs));
+      }
       diwrite(&dinode, i);
       return i;
     }
@@ -417,6 +421,11 @@ static uint32_t iwalk(inode_t *inode, uint32_t no) {
 }
 
 int iread(inode_t *inode, uint32_t off, void *buf, uint32_t len) {
+  if (itype(inode) == TYPE_SYMLINK) {
+    len = MIN(len, inode->dinode.size - off);
+    memcpy(buf, (char *)inode->dinode.addrs + off, len);
+    return len;
+  }
   uint32_t blkno = iwalk(inode, off / BLK_SIZE);
   uint32_t blkoff = off % BLK_SIZE;
   uint32_t remaining = len;
@@ -436,6 +445,13 @@ int iread(inode_t *inode, uint32_t off, void *buf, uint32_t len) {
 }
 
 int iwrite(inode_t *inode, uint32_t off, const void *buf, uint32_t len) {
+  if (itype(inode) == TYPE_SYMLINK) {
+    len = MIN(len, sizeof(inode->dinode.addrs) - off);
+    memcpy((char *)inode->dinode.addrs + off, buf, len);
+    inode->dinode.size = off + len;
+    iupdate(inode);
+    return len;
+  }
   if (off > isize(inode)) {
     return -1;
   }
@@ -497,7 +513,9 @@ inode_t *idup(inode_t *inode) {
 void iclose(inode_t *inode) {
   assert(inode);
   if (inode->ref == 1 && inode->del) {
-    itrunc(inode);
+    if (itype(inode) != TYPE_SYMLINK) {
+      itrunc(inode);
+    }
     difree(inode->no);
   }
   inode->ref -= 1;
@@ -620,6 +638,51 @@ int ilink(const char * oldpath, const char *newpath) {
 
   iclose(parent);
   iclose(oldinode);
+  return 0;
+}
+int isymlink(const char *oldpath, const char *newpath) {
+  // Open the parent directory of the new path
+  char name[MAX_NAME + 1];
+  inode_t *parent = iopen_parent(newpath, name);
+  if (parent == NULL) {
+    return -1;
+  }
+
+  // Check if the new path already exists
+  if (ilookup(parent, name, NULL, TYPE_NONE) != NULL) {
+    iclose(parent);
+    return -1;
+  }
+
+  // Allocate a new inode for the symlink
+  uint32_t ino = dialloc(TYPE_SYMLINK);
+  inode_t *inode = iget(ino);
+  if (inode == NULL) {
+    iclose(parent);
+    return -1;
+  }
+
+  // Initialize the inode as a symbolic link
+  inode->dinode.size = strlen(oldpath);
+  iwrite(inode, 0, oldpath, strlen(oldpath));
+  iupdate(inode);
+
+  // Create a new directory entry for the symlink
+  dirent_t dirent;
+  dirent.inode = ino;
+  strncpy(dirent.name, name, MAX_NAME);
+  dirent.name[MAX_NAME] = '\0';
+
+  // Write the new directory entry to the parent directory
+  uint32_t off = isize(parent);
+  if (iwrite(parent, off, &dirent, sizeof(dirent)) != sizeof(dirent)) {
+    iclose(parent);
+    iclose(inode);
+    return -1;
+  }
+
+  iclose(parent);
+  iclose(inode);
   return 0;
 }
 #endif

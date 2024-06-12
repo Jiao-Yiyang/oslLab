@@ -63,7 +63,6 @@ file_t *fopen(const char *path, int mode) {
     char target_path[MAX_NAME + 1];
     int len = iread(ip, 0, target_path, MAX_NAME);
     if (len < 0) {
-
       goto bad;
     }
     target_path[len] = '\0'; // 确保字符串终止
