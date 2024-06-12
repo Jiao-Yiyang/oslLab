@@ -7,7 +7,7 @@
 #include "proc.h"
 #include "timer.h"
 #include "file.h"
-typedef unsigned int mode_t;
+
 typedef int (*syshandle_t)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 
 extern void *syscall_handle[NR_SYS];
@@ -333,9 +333,6 @@ int sys_symlink(const char *oldpath, const char *newpath) {
   return isymlink(oldpath, newpath);
 }
 
-int mkfifo(const char *pathname, mode_t mode){
-  return -1;
-};
 
 void *syscall_handle[NR_SYS] = {
   [SYS_write] = sys_write,

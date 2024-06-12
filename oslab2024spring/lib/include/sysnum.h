@@ -23,7 +23,7 @@
 #define SYS_fstat     18
 #define SYS_chdir     19
 #define SYS_unlink    20
-
+#define SYS_mkfifo    34
 // optional syscall
 #define SYS_mmap      21
 #define SYS_munmap    22

@@ -146,3 +146,8 @@ int link(const char *oldpath, const char *newpath) {
 int symlink(const char *oldpath, const char *newpath) {
   return (int)syscall(SYS_symlink, (size_t)oldpath, (size_t)newpath, 0, 0, 0);
 }
+
+int mkfifo(const char *path, int mode) {
+  return (int)syscall(SYS_mkfifo, (size_t)path, (size_t)mode, 0, 0, 0);
+}
+

@@ -221,9 +221,6 @@ static void bfree(uint32_t blkno) {
   uint32_t byte;
   int i = blkno / 32;
   int j = blkno % 32;
-  if(i * 4 +4 > BLK_SIZE){
-    printf("Error in bfree: i * 4 (%u) + sizeof(uint32_t) (%u) exceeds BLK_SIZE (%u)\n", i * 4, sizeof(uint32_t), BLK_SIZE);
-  }
   bread(&byte, 4, sb.bitmap, i * 4);
   byte &= ~(1<< j);
   bwrite(&byte, 4,sb.bitmap, 4 *i );
@@ -403,33 +400,6 @@ inode_t *iopen(const char *path, int type) {
   return inode;
 }
 
-// static uint32_t iwalk(inode_t *inode, uint32_t no) {
-//   // return the blkno of the file's data's no th block, if no, alloc it
-//   if (no < NDIRECT) {
-//     // direct address
-//     if (inode->dinode.addrs[no] == 0) {
-//       inode->dinode.addrs[no] = balloc();
-//       iupdate(inode);
-//     }
-//     return inode->dinode.addrs[no];
-//   }
-//   no -= NDIRECT;
-//   if (no < NINDIRECT) {
-//     // indirect address
-//     if (inode->dinode.addrs[NDIRECT] == 0) {
-//       inode->dinode.addrs[NDIRECT] = balloc();
-//       iupdate(inode);
-//     }
-//     uint32_t indirect;
-//     bread(&indirect, sizeof(uint32_t), inode->dinode.addrs[NDIRECT], no * sizeof(uint32_t));
-//     if (indirect == 0) {
-//       indirect = balloc();
-//       bwrite(&indirect, sizeof(uint32_t), inode->dinode.addrs[NDIRECT], no * sizeof(uint32_t));
-//     }
-//     return indirect;
-//   }
-//   assert(0); // file too big, not need to handle this case
-// }
 static uint32_t iwalk(inode_t *inode, uint32_t no) {
   // return the blkno of the file's data's no th block, if no, alloc it
   if (no < NDIRECT) {
@@ -449,10 +419,6 @@ static uint32_t iwalk(inode_t *inode, uint32_t no) {
       iupdate(inode);
     }
     uint32_t indirect;
-    // if (no * sizeof(uint32_t) + sizeof(uint32_t) > BLK_SIZE) {
-    //   printf("Error in iwalk: indirect read size (%u) + offset (%u) exceeds BLK_SIZE (%u)\n", sizeof(uint32_t), no * sizeof(uint32_t), BLK_SIZE);
-    //   assert(0);
-    // }
     bread(&indirect, sizeof(uint32_t), inode->dinode.addrs[NDIRECT], no * sizeof(uint32_t));
     if (indirect == 0) {
       indirect = balloc();
@@ -468,19 +434,13 @@ static uint32_t iwalk(inode_t *inode, uint32_t no) {
       iupdate(inode);
     }
     uint32_t indirect1, indirect2;
-    // if ((no / NINDIRECT) * sizeof(uint32_t) + sizeof(uint32_t) > BLK_SIZE) {
-    //   printf("Error in iwalk: indirect1 read size (%u) + offset (%u) exceeds BLK_SIZE (%u)\n", sizeof(uint32_t), (no / NINDIRECT) * sizeof(uint32_t), BLK_SIZE);
-    //   assert(0);
-    // }
+   
     bread(&indirect1, sizeof(uint32_t), inode->dinode.addrs[NDIRECT + 1], (no / NINDIRECT) * sizeof(uint32_t));
     if (indirect1 == 0) {
       indirect1 = balloc();
       bwrite(&indirect1, sizeof(uint32_t), inode->dinode.addrs[NDIRECT + 1], (no / NINDIRECT) * sizeof(uint32_t));
     }
-    // if ((no % NINDIRECT) * sizeof(uint32_t) + sizeof(uint32_t) > BLK_SIZE) {
-    //   printf("Error in iwalk: indirect2 read size (%u) + offset (%u) exceeds BLK_SIZE (%u)\n", sizeof(uint32_t), (no % NINDIRECT) * sizeof(uint32_t), BLK_SIZE);
-    //   assert(0);
-    // }
+   
     bread(&indirect2, sizeof(uint32_t), indirect1, (no % NINDIRECT) * sizeof(uint32_t));
     if (indirect2 == 0) {
       indirect2 = balloc();
@@ -506,9 +466,7 @@ int iread(inode_t *inode, uint32_t off, void *buf, uint32_t len) {
   while (remaining > 0 && off + bytesRead < isize(inode)) {
     uint32_t bytesToRead = MIN(remaining, BLK_SIZE - blkoff);
     bytesToRead = MIN(bytesToRead, isize(inode) - off - bytesRead);
-    // if (blkoff + bytesToRead > BLK_SIZE) {
-    //   printf("Error in iread: blkoff (%u) + bytesToRead (%u) exceeds BLK_SIZE (%u)\n", blkoff, bytesToRead, BLK_SIZE);
-    // }
+
     bread(buf + bytesRead, bytesToRead, blkno, blkoff);
     bytesRead += bytesToRead;
     remaining -= bytesToRead;
@@ -553,41 +511,11 @@ int iwrite(inode_t *inode, uint32_t off, const void *buf, uint32_t len) {
   return pos - off;
 }
 
-
-// void itrunc(inode_t *inode) {
-//   // Lab3-2: free all data block used by inode (direct and indirect)
-//   // mark all address of inode 0 and mark its size 0
-//   for (int i = 0; i < NDIRECT; i++) {
-//     if (inode->dinode.addrs[i]) {
-//       bfree(inode->dinode.addrs[i]);
-//       inode->dinode.addrs[i] = 0;
-//     }
-//   }
-
-//   if (inode->dinode.addrs[NDIRECT]) {
-//     uint32_t indirect = inode->dinode.addrs[NDIRECT];
-//     uint32_t block;
-//     for (int i = 0; i < NINDIRECT; i++) {
-//       bread(&block, sizeof(uint32_t), indirect, i * sizeof(uint32_t));
-//       if (block) {
-//         bfree( block);
-//       }
-//     }
-//     bfree(inode->dinode.addrs[NDIRECT]);
-//     inode->dinode.addrs[NDIRECT] = 0;
-//   }
-
-//   inode->dinode.size = 0;
-//   iupdate(inode);
-// }
 void itrunc(inode_t *inode) {
   // free all data block used by inode (direct, one-level indirect and two-level indirect)
   // mark all address of inode 0 and mark its size 0
   for (int i = 0; i < NDIRECT; i++) {
     if (inode->dinode.addrs[i]) {
-      if(inode->dinode.addrs[i] > 4096*32){
-        printf("Error in itrunc: inode->dinode.addrs[%d] (%u) > 4096*32\n", i, inode->dinode.addrs[i]);
-      }
       bfree(inode->dinode.addrs[i]);
       inode->dinode.addrs[i] = 0;
     }
