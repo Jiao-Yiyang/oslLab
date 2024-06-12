@@ -68,10 +68,11 @@ typedef struct {
 
 // on-disk inode
 typedef struct {
-  uint32_t type;   // file type
-  uint32_t device; // if it is a dev, its dev_id
+  uint16_t type;   // file type
+  uint16_t device; // if it is a dev, its dev_id
   uint32_t size;   // file size
   uint32_t addrs[NDIRECT + 1]; // data block addresses, 12 direct and 1 indirect
+  uint32_t ref;
 } dinode_t;
 
 // directory is a file containing a sequence of dirent structures

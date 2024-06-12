@@ -58,7 +58,25 @@ file_t *fopen(const char *path, int mode) {
     fp->dev_op = dev_get(idevid(ip));
     iclose(ip);
     ip = NULL;
-  } else assert(0);
+  } else if (type == TYPE_SYMLINK) {
+    // 处理符号链接
+    char target_path[MAX_NAME + 1];
+    int len = iread(ip, 0, target_path, MAX_NAME);
+    if (len < 0) {
+
+      goto bad;
+    }
+    target_path[len] = '\0'; // 确保字符串终止
+
+    iclose(ip);
+    ip = NULL;
+    fp->ref--; // 释放刚分配的文件结构
+    fp = fopen(target_path, mode); // 递归调用打开目标路径
+    return fp;
+  } else {
+    //printf("Unknown inode type: %d\n", type);
+    assert(0);
+  }
   fp->readable = !(mode & O_WRONLY);
   fp->writable = (mode & O_WRONLY) || (mode & O_RDWR);
   return fp;

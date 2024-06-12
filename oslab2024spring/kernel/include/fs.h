@@ -21,7 +21,8 @@ uint32_t ino(inode_t *inode);
 int idevid(inode_t *inode);
 void iadddev(const char *name, int id);
 int iremove(const char *path);
-
+int ilink(const char *src, const char *dst);
+int isymlink(const char *oldpath, const char *newpath);
 #ifdef EASY_FS
 
 #define MAX_NAME  (31 - 2 * sizeof(uint32_t))

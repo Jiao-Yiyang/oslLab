@@ -64,6 +64,7 @@ int sys_brk(void *addr) {
     cur_pcb->brk = new_brk;
   } else if (new_brk < cur_pcb->brk) {
     // can just do nothing
+    cur_pcb->brk = new_brk;
   }
   return 0;
 }
@@ -324,7 +325,7 @@ int sys_pipe(int fd[2]) {
 }
 
 int sys_link(const char *oldpath, const char *newpath) {
-  TODO();
+  return ilink(oldpath, newpath);
 }
 
 int sys_symlink(const char *oldpath, const char *newpath) {
