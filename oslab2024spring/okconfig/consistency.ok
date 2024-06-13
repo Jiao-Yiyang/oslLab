@@ -1,6 +1,6 @@
 {
-    "name": "concurrency",
-    "endpoint": "concurrency",
+    "name": "consistency",
+    "endpoint": "consistency",
     "src": [
         "boot/boot.c",
         "boot/boot.h",
@@ -42,7 +42,8 @@
         "utils/mkfs.c",
         "user/ulib/syscall.c",
         "user/include/ulib.h",
-        "lib/include/sysnum.h"
+        "lib/include/sysnum.h",
+        "lib/include/lib.h"
     ],
     "tests": {},
     "protocols": [

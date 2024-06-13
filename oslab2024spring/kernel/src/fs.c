@@ -235,7 +235,7 @@ static inode_t *iget(uint32_t no) {
   // otherwise, find a empty inode slot, init it and return it
   // if no empty inode slot, just abort
   for (int i = 0; i < INODE_NUM; i++) {
-    if (inodes[i].ref >= 1 && inodes[i].no == no) {
+    if (  inodes[i].no == no) {
       inodes[i].ref += 1;
       return &inodes[i];
     }
@@ -298,10 +298,13 @@ static void idirinit(inode_t *inode, inode_t *parent) {
   dirent_t dirent;
   // set .
   dirent.inode = inode->no;
+  inode->dinode.ref ++; 
   strcpy(dirent.name, ".");
+   
   iwrite(inode, 0, &dirent, sizeof dirent);
   // set ..
   dirent.inode = parent->no;
+  parent->dinode.ref ++; 
   strcpy(dirent.name, "..");
   iwrite(inode, sizeof dirent, &dirent, sizeof dirent);
 }
@@ -338,10 +341,14 @@ static inode_t *ilookup(inode_t *parent, const char *name, uint32_t *off, int ty
   if(type == TYPE_DIR) {
     idirinit(inode, parent);
   }
-  dirent.inode = ino;
+  dirent.inode = inode->no;
+  inode->dinode.ref ++;
   strcpy(dirent.name, name);
-  if (empty == size) empty = size;
+  
+
   iwrite(parent, empty, &dirent, sizeof dirent);
+  if (off != NULL){
+    *off = empty; }
   return inode;
 }
 
@@ -566,8 +573,20 @@ inode_t *idup(inode_t *inode) {
 
 void iclose(inode_t *inode) {
   assert(inode);
+
   if (inode->ref == 1 && inode->del) {
-    if (itype(inode) != TYPE_SYMLINK) {
+    if (inode->dinode.type == TYPE_DIR)
+    {
+      dirent_t dirent;
+      iread(inode, sizeof dirent, &dirent, sizeof dirent);
+      inode_t *parent = iget(dirent.inode);
+      parent->dinode.ref --;
+      inode->dinode.ref --;
+    }
+    else if (inode->dinode.type == TYPE_FILE){
+      inode->dinode.ref --;
+    }
+    if (inode->dinode.ref == 0 &&itype(inode) != TYPE_SYMLINK) {
       itrunc(inode);
     }
     difree(inode->no);

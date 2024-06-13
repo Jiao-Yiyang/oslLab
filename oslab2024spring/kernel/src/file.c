@@ -50,6 +50,7 @@ file_t *fopen(const char *path, int mode) {
     if(mode & O_TRUNC){
       itrunc(ip);
     }
+    
     fp->type = TYPE_FILE; // file_t don't and needn't distingush between file and dir
     fp->inode = ip;
     fp->offset = 0;
@@ -131,6 +132,7 @@ uint32_t fseek(file_t *file, uint32_t off, int whence) {
       file->offset = isize(file->inode)+ off;
     }
     return file->offset;
+    
   }
   return -1;
 }
