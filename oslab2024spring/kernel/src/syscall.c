@@ -333,6 +333,10 @@ int sys_symlink(const char *oldpath, const char *newpath) {
   return isymlink(oldpath, newpath);
 }
 
+int sys_mkfifo(const char *path, int mode) {
+  TODO();
+}
+
 
 void *syscall_handle[NR_SYS] = {
   [SYS_write] = sys_write,
@@ -367,4 +371,5 @@ void *syscall_handle[NR_SYS] = {
   [SYS_cv_close] = sys_cv_close,
   [SYS_pipe] = sys_pipe,
   [SYS_link] = sys_link,
-  [SYS_symlink] = sys_symlink};
+  [SYS_symlink] = sys_symlink,
+  [SYS_mkfifo] = sys_mkfifo};

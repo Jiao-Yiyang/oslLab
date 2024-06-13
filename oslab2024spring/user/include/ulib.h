@@ -72,4 +72,5 @@ struct dirent {
 };
 
 int mkfifo(const char *path, int mode);
+
 #endif
